@@ -29,17 +29,16 @@
   "dependencies": {
     "babel": "5.8.23",
     "babel-plugin-typecheck": "1.2.0",
-    "h2o2": "4.0.1",
-    "hapi": "9.3.1",
+    "express": "^4.13.3",
     "history": "1.9.1",
-    "inert": "3.0.1",
     "isomorphic-fetch": "2.1.1",
     "piping": "0.2.0",
-    "react": "0.14.0-rc1",
-    "react-dom": "0.14.0-rc1",
+    "react": "0.14.0",
+    "react-dom": "0.14.0",
     "react-inline-css": "2.0.0",
-    "react-router": "1.0.0-rc1",
-    "react-transmit": "3.0.6"
+    "react-router": "^1.0.0-rc3",
+    "react-transmit": "3.0.6",
+    "serve-favicon": "^2.3.0"
   },
   "devDependencies": {
     "babel-core": "5.8.25",
