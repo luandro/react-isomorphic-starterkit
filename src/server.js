@@ -1,91 +1,34 @@
-import {Server} from "hapi";
-import h2o2 from "h2o2";
-import inert from "inert";
+import express from "express";
+import path from "path";
+import favicon from "serve-favicon";
 import React from "react";
 import ReactDOM from "react-dom/server";
 import {RoutingContext, match} from "react-router";
 import createLocation from "history/lib/createLocation";
 import Transmit from "react-transmit";
 import routes from "views/routes";
-import url from "url";
+import request from "request";
 
+const app = express();
+const port = process.env.PORT || 8000;
 var hostname = process.env.HOSTNAME || "localhost";
-
-/**
- * Start Hapi server on port 8000.
- */
-const server = new Server();
-
-server.connection({host: hostname, port: process.env.PORT || 8000});
-
-server.register([
-	h2o2,
-    inert
-], function (err) {
-	if (err) {
-		throw err;
-	}
-
-	server.start(function () {
-		console.info("==> ✅  Server is listening");
-		console.info("==> 🌎  Go to " + server.info.uri.toLowerCase());
-	});
-});
-
+const staticDir = path.join(__dirname,'..','static');
+app.use(favicon(staticDir + '/favicon.ico'));
 /**
  * Attempt to serve static requests from the public folder.
  */
-server.route({
-	method:  "GET",
-	path:    "/{params*}",
-	handler: {
-		file: (request) => "static" + request.path
-	}
-});
-
-/**
- * Endpoint that proxies all GitHub API requests to https://api.github.com.
- */
-server.route({
-	method: "GET",
-	path: "/api/github/{path*}",
-	handler: {
-		proxy: {
-			passThrough: true,
-			mapUri (request, callback) {
-				callback(null, url.format({
-					protocol: "https",
-					host:     "api.github.com",
-					pathname: request.params.path,
-					query:    request.query
-				}));
-			},
-			onResponse (err, res, request, reply, settings, ttl) {
-				reply(res);
-			}
-		}
-	}
-});
-
+app.use(express.static(staticDir));
 /**
  * Catch dynamic requests here to fire-up React Router.
  */
-server.ext("onPreResponse", (request, reply) => {
-	if (typeof request.response.statusCode !== "undefined") {
-		return reply.continue();
-	}
-
-	let location = createLocation(request.path);
-
-	match({routes, location}, (error, redirectLocation, renderProps) => {
-		if (redirectLocation) {
-			reply.redirect(redirectLocation.pathname + redirectLocation.search)
-		}
-		else if (error || !renderProps) {
-			reply.continue();
-		}
-		else {
-			Transmit.renderToString(RoutingContext, renderProps).then(({reactString, reactData}) => {
+app.get('*', (req, res) => {
+	match({routes, location: req.url }, (error, redirectLocation, renderProps) => {
+		if (error) {
+	    	res.status(500).send(error.message)
+	    } else if (redirectLocation) {
+	      	res.status(302).redirect(redirectLocation.pathname + redirectLocation.search)
+	    } else if (renderProps) {
+	      	Transmit.renderToString(RoutingContext, renderProps).then(({reactString, reactData}) => {
 				let output = (
 					`<!doctype html>
 					<html lang="en-us">
@@ -103,10 +46,34 @@ server.ext("onPreResponse", (request, reply) => {
 				const webserver = process.env.NODE_ENV === "production" ? "" : "//" + hostname + ":8080";
 				output          = Transmit.injectIntoMarkup(output, reactData, [`${webserver}/dist/client.js`]);
 
-				reply(output);
+				res.status(200).send(output);
 			}).catch((error) => {
 				console.error(error);
 			});
-		}
+	    } else {
+	      	res.send(404, 'Not found')
+	    }
 	});
+});
+/**
+ * Endpoint that proxies all GitHub API requests to https://api.github.com.
+ */
+app.get('/api/github/:path', (req, res) => {
+    request('https://api.github.com/'+req.params.path, (error, response, body) => {
+        if (!error && response.statusCode === 200) {
+        console.log(body);
+          res.send(body);
+        }
+      });
+});
+/**
+ * Start Hapi server on port 8000.
+ */
+app.listen(port, (error) => {
+	if (error) {
+		console.error(error);
+		return process.exit(3);
+	}
+	console.info("==> ✅  Server is listening");
+	console.info("==> 🌎  Go to http://localhost:%s.", port);
 });
